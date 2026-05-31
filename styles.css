@@ -1,0 +1,353 @@
+:root {
+  color-scheme: dark;
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #11161f;
+  color: #edf2ff;
+  accent-color: #78c2ff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.app-shell {
+  width: min(100%, 980px);
+  display: grid;
+  gap: 24px;
+}
+
+header h1 {
+  margin: 0 0 8px;
+  font-size: clamp(2rem, 3vw, 3rem);
+}
+
+header p {
+  margin: 0;
+  color: #b8c7ff;
+}
+
+.controls {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.control-card,
+.speedometer-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 22px;
+  padding: 22px;
+  box-shadow: 0 24px 50px rgba(0, 0, 0, 0.24);
+}
+
+.control-card label,
+.control-card p,
+.details h2 {
+  display: block;
+  margin-bottom: 12px;
+  font-weight: 600;
+}
+
+.rpm-display {
+  font-size: 1.4rem;
+  margin-bottom: 12px;
+  color: #f8fbff;
+}
+
+input[type="range"] {
+  width: 100%;
+  accent-color: #78c2ff;
+}
+
+.power-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 18px 0 14px;
+}
+
+.power-card {
+  padding: 16px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  text-align: center;
+}
+
+.power-title {
+  display: block;
+  margin-bottom: 8px;
+  color: #c4d0ff;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.power-card strong {
+  display: block;
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.power-unit {
+  display: block;
+  color: #9bb3ff;
+  margin-top: 6px;
+}
+
+.power-curve-card {
+  padding: 16px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.power-curve-label {
+  color: #c4d0ff;
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.power-curve-legend {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 10px;
+  color: #b2c0ff;
+  font-size: 0.9rem;
+}
+
+.curve-key {
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+  display: inline-block;
+  margin-right: 4px;
+}
+
+.hp-key {
+  background: #78c2ff;
+}
+
+.tq-key {
+  background: #ffb86c;
+}
+
+.power-curve-graph {
+  width: 100%;
+  height: 130px;
+  overflow: visible;
+}
+
+.power-curve-graph path {
+  stroke-linecap: round;
+}
+
+.power-curve-graph circle {
+  transition: transform 0.15s ease;
+}
+
+.hgate-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(72px, 1fr));
+  grid-template-rows: minmax(72px, auto) minmax(72px, auto) 1fr;
+  gap: 10px;
+  justify-items: center;
+  align-items: center;
+  width: min(100%, 360px);
+  margin: 0 auto;
+}
+
+.gate-slot {
+  display: grid;
+  place-items: center;
+  width: 68px;
+  height: 68px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.12);
+  color: #edf2ff;
+  font-size: 1.05rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.2s ease, border-color 0.2s ease;
+  pointer-events: auto;
+}
+
+.gate-slot:hover {
+  transform: translateY(-2px);
+  background: rgba(120, 194, 255, 0.18);
+}
+
+.gate-slot.selected {
+  background: #78c2ff;
+  color: #0b1726;
+  border-color: #78c2ff;
+  box-shadow: 0 12px 24px rgba(120, 194, 255, 0.25);
+}
+
+.gate-slot.reverse {
+  grid-column: 1 / span 3;
+  width: auto;
+  max-width: 180px;
+  border-radius: 24px;
+}
+
+.gate-slot:hover {
+  background: rgba(120, 194, 255, 0.16);
+  transform: translateY(-1px);
+}
+
+.gate-slot.selected {
+  background: #78c2ff;
+  color: #0b1726;
+  border-color: #78c2ff;
+  box-shadow: 0 14px 28px rgba(120, 194, 255, 0.25);
+}
+
+.empty-slot {
+  background: transparent;
+}
+
+.gear-stats {
+  margin-top: 16px;
+  color: #d0d9ff;
+}
+
+.speedometer {
+  display: grid;
+  gap: 18px;
+  align-items: center;
+}
+
+.gauge {
+  position: relative;
+  width: min(320px, 100%);
+  aspect-ratio: 1 / 1;
+  margin: 0 auto;
+}
+
+.gauge-face {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 35%, rgba(255, 255, 255, 0.12), transparent 36%),
+    radial-gradient(circle at 50% 50%, #16203e 42%, #0e1524 100%);
+  border: 6px solid rgba(255, 255, 255, 0.12);
+}
+
+.needle {
+  position: absolute;
+  left: 50%;
+  bottom: 50%;
+  width: 4px;
+  height: 48%;
+  background: linear-gradient(180deg, #78c2ff, #2e8bff);
+  transform-origin: bottom center;
+  transform: rotate(-90deg);
+  border-radius: 999px;
+  box-shadow: 0 0 24px rgba(120, 194, 255, 0.45);
+}
+
+.gauge-center {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 24px;
+  height: 24px;
+  background: #e9f5ff;
+  border-radius: 50%;
+  border: 4px solid rgba(8, 16, 31, 0.8);
+  z-index: 1;
+}
+
+.gauge-labels {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.gauge-label {
+  position: absolute;
+  color: #a0b0d4;
+  font-size: 0.94rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.label-0 {
+  left: 18%;
+  top: 56%;
+  transform: translate(-50%, -50%);
+}
+
+.label-40 {
+  left: calc(28% - 10px);
+  top: 26%;
+  transform: translate(-50%, -50%);
+}
+
+.label-80 {
+  left: 50%;
+  top: 16%;
+  transform: translate(-50%, -50%);
+}
+
+.label-120 {
+  left: calc(68% + 24px);
+  top: calc(36% - 30px);
+  transform: translate(-50%, -50%);
+}
+
+.label-160 {
+  left: calc(82% + 6px);
+  top: calc(56% - 16px);
+  transform: translate(-50%, -50%);
+}
+
+.speed-readout {
+  text-align: center;
+}
+
+.speed-readout p {
+  margin: 0 0 8px;
+  color: #a8b8e9;
+}
+
+.speed-values {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: clamp(2.5rem, 4vw, 4rem);
+  font-weight: 700;
+}
+
+.metric {
+  margin-top: 8px;
+  color: #bcc7e8;
+}
+
+.details ul {
+  margin: 0;
+  padding-left: 18px;
+  color: #cfd8f9;
+}
+
+.details li {
+  margin-bottom: 8px;
+}
+
+@media (max-width: 640px) {
+  body {
+    padding: 16px;
+  }
+}

@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Manual Transmission Speed Simulator</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="app-shell">
+    <header>
+      <h1>Manual Transmission Speed Simulator</h1>
+      <p>Rev the engine, select a gear, and watch the speedometer respond.</p>
+    </header>
+
+    <section class="controls">
+      <div class="control-card">
+        <label for="rpmRange">Engine RPM</label>
+        <div class="rpm-display">
+          <span id="rpmValue">800</span> RPM
+        </div>
+        <input id="rpmRange" type="range" min="800" max="7500" step="50" value="800" />
+
+        <div class="power-row">
+          <div class="power-card">
+            <span class="power-title">Horsepower</span>
+            <strong id="hpValue">45</strong>
+            <span class="power-unit">hp</span>
+          </div>
+          <div class="power-card torque-card">
+            <span class="power-title">Torque</span>
+            <strong id="torqueValue">300</strong>
+            <span class="power-unit">lb-ft</span>
+          </div>
+        </div>
+
+        <div class="power-curve-card">
+          <div class="power-curve-label">Porsche 911 power curve</div>
+          <div class="power-curve-legend">
+            <span class="curve-key hp-key"></span><span>Horsepower</span>
+            <span class="curve-key tq-key"></span><span>Torque</span>
+          </div>
+          <svg class="power-curve-graph" viewBox="0 0 320 140" aria-hidden="true">
+            <path id="powerCurvePathHp" d="" fill="none" stroke="#78c2ff" stroke-width="3" />
+            <path id="powerCurvePathTorque" d="" fill="none" stroke="#ffb86c" stroke-width="3" />
+            <circle id="powerCurveHandleHp" cx="0" cy="0" r="5" fill="#fff" stroke="#78c2ff" stroke-width="2" />
+            <circle id="powerCurveHandleTorque" cx="0" cy="0" r="5" fill="#fff" stroke="#ffb86c" stroke-width="2" />
+          </svg>
+        </div>
+      </div>
+
+      <div class="control-card">
+        <p>Transmission Gear</p>
+        <div class="hgate-grid" role="group" aria-label="6-speed gear selector">
+          <button type="button" class="gate-slot selected" data-gear="1">1</button>
+          <button type="button" class="gate-slot" data-gear="3">3</button>
+          <button type="button" class="gate-slot" data-gear="5">5</button>
+          <button type="button" class="gate-slot" data-gear="2">2</button>
+          <button type="button" class="gate-slot" data-gear="4">4</button>
+          <button type="button" class="gate-slot" data-gear="6">6</button>
+        </div>
+
+        <div class="gear-stats">
+          <span>Gear ratio: <strong id="gearRatio">3.82</strong></span>
+        </div>
+      </div>
+    </section>
+
+    <section class="speedometer-card">
+      <div class="speedometer">
+        <div class="gauge">
+          <div class="gauge-face"></div>
+          <div class="needle" id="needle"></div>
+          <div class="gauge-center"></div>
+          <div class="gauge-labels">
+            <span class="gauge-label label-0">0</span>
+            <span class="gauge-label label-40">40</span>
+            <span class="gauge-label label-80">80</span>
+            <span class="gauge-label label-120">120</span>
+            <span class="gauge-label label-160">160</span>
+          </div>
+        </div>
+        <div class="speed-readout">
+          <p>Speed</p>
+          <div class="speed-values">
+            <strong id="speedValue">0</strong>
+            <span>mph</span>
+          </div>
+          <div class="metric">(<span id="speedKmh">0</span> km/h)</div>
+        </div>
+      </div>
+      <div class="details">
+        <h2>Transmission model</h2>
+        <ul>
+          <li>Redline: 7500 RPM</li>
+          <li>Final drive ratio: 3.42</li>
+          <li>Wheel diameter: 26 in (approx. 0.66 m)</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
