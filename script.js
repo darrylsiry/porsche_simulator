@@ -18,6 +18,7 @@ const speedKmh = document.getElementById('speedKmh');
 const needle = document.getElementById('needle');
 const tachNeedle = document.getElementById('tachNeedle');
 const tachGauge = document.querySelector('.gauge.tach');
+const soundToggle = document.getElementById('soundToggle');
 
 const gearRatios = {
   1: 3.91,
@@ -260,12 +261,27 @@ function updateDashboard() {
   const atRedline = rpm >= redlineRpm;
   tachGauge.classList.toggle('redline-active', atRedline);
   rpmChip.classList.toggle('redline', atRedline);
+
+  // Engine sound tracks RPM
+  if (typeof EngineAudio !== 'undefined') {
+    EngineAudio.setRpm(rpm);
+  }
 }
 
 /* ---------------- Events ---------------- */
 rpmRange.addEventListener('input', updateDashboard);
 rpmUp.addEventListener('click', () => adjustRpm(rpmStep));
 rpmDown.addEventListener('click', () => adjustRpm(-rpmStep));
+
+if (soundToggle) {
+  soundToggle.addEventListener('click', () => {
+    const on = EngineAudio.toggle();
+    EngineAudio.setRpm(Number(rpmRange.value));
+    soundToggle.classList.toggle('active', on);
+    soundToggle.setAttribute('aria-pressed', String(on));
+    soundToggle.querySelector('.sound-label').textContent = on ? 'Sound on' : 'Sound off';
+  });
+}
 
 document.addEventListener('keydown', (event) => {
   if (event.key === 'ArrowRight') {
