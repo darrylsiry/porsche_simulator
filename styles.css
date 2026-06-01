@@ -562,27 +562,7 @@ input[type="range"]::-moz-range-thumb {
     0 20px 44px rgba(0, 0, 0, 0.5);
 }
 
-/* Engraved white H-pattern, lines stop at the circle centers */
-.gate-rail {
-  position: absolute;
-  left: 50%;
-  right: 50%;
-  top: 50%;
-  bottom: 50%;
-  pointer-events: none;
-  background:
-    /* three vertical channels */
-    linear-gradient(#fff, #fff) 0 0 / 3px 100% no-repeat,
-    linear-gradient(#fff, #fff) 50% 0 / 3px 100% no-repeat,
-    linear-gradient(#fff, #fff) 100% 0 / 3px 100% no-repeat,
-    /* center horizontal connector */
-    linear-gradient(#fff, #fff) 0 50% / 100% 3px no-repeat;
-  /* span exactly between the circle centers so each line ends at a circle */
-  inset: 36% 28.7%;
-  opacity: 0.92;
-}
-
-/* Number sits inside a small engraved circle at each end of the H */
+/* Number sits inside a small engraved circle */
 .gate-slot {
   position: relative;
   z-index: 1;
