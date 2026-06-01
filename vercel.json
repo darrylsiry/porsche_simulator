@@ -1,14 +1,16 @@
 {
-  "rewrites": [
+  "redirects": [
     {
       "source": "/",
       "has": [{ "type": "host", "value": "siryous.app" }],
-      "destination": "/hub/index.html"
+      "destination": "/hub/",
+      "permanent": false
     },
     {
       "source": "/",
       "has": [{ "type": "host", "value": "www.siryous.app" }],
-      "destination": "/hub/index.html"
+      "destination": "/hub/",
+      "permanent": false
     }
   ]
 }
