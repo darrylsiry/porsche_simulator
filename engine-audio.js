@@ -48,17 +48,21 @@ const EngineAudio = (() => {
   const IDLE_RPM = 800;
   const MAX_RPM = 7500;
 
-  // Pitched harmonics of the firing frequency (kept nearly in-tune to
-  // avoid the warbly "beating" that made it sound alien).
+  // Drop the tonal pitch a full octave for a deeper, throatier note.
+  const PITCH_SCALE = 0.5;
+
+  // Pitched harmonics of the firing frequency. Weighted toward the low
+  // end (strong fundamental + sub-octave) for a throaty, bassy growl
+  // instead of a buzzy high-pitched tone.
   const HARMONICS = [
-    { mult: 1, type: 'sawtooth', gain: 0.5, detune: 0 },
-    { mult: 2, type: 'sawtooth', gain: 0.3, detune: 3 },
-    { mult: 3, type: 'square', gain: 0.14, detune: 0 },
-    { mult: 4, type: 'sawtooth', gain: 0.08, detune: -3 },
+    { mult: 0.5, type: 'sawtooth', gain: 0.55, detune: 0 },
+    { mult: 1, type: 'sawtooth', gain: 0.5, detune: 2 },
+    { mult: 2, type: 'sawtooth', gain: 0.16, detune: -2 },
+    { mult: 3, type: 'square', gain: 0.05, detune: 0 },
   ];
 
   function firingFrequency(rpm) {
-    return (rpm / 60) * 3; // flat-six fires 3x per revolution
+    return (rpm / 60) * 3 * PITCH_SCALE; // flat-six fires 3x per revolution, octave down
   }
 
   function norm(rpm) {
@@ -101,8 +105,8 @@ const EngineAudio = (() => {
     // ---- Engine body: harmonics + noise -> AM gain -> body filter ----
     bodyFilter = ctx.createBiquadFilter();
     bodyFilter.type = 'lowpass';
-    bodyFilter.frequency.value = 600;
-    bodyFilter.Q.value = 3;
+    bodyFilter.frequency.value = 380;
+    bodyFilter.Q.value = 4;
 
     engineGain = ctx.createGain();
     engineGain.gain.value = 0.9;
@@ -136,10 +140,10 @@ const EngineAudio = (() => {
     noiseSrc.loop = true;
     noiseBand = ctx.createBiquadFilter();
     noiseBand.type = 'bandpass';
-    noiseBand.frequency.value = 320;
+    noiseBand.frequency.value = 180;
     noiseBand.Q.value = 0.8;
     noiseGain = ctx.createGain();
-    noiseGain.gain.value = 0.5;
+    noiseGain.gain.value = 0.45;
     noiseSrc.connect(noiseBand);
     noiseBand.connect(noiseGain);
     noiseGain.connect(amGain);
@@ -163,7 +167,7 @@ const EngineAudio = (() => {
     subOsc.type = 'sine';
     subOsc.frequency.value = baseFreq;
     subGain = ctx.createGain();
-    subGain.gain.value = 0.22;
+    subGain.gain.value = 0.38;
     subOsc.connect(subGain);
     subGain.connect(masterGain);
     subOsc.start();
@@ -213,16 +217,18 @@ const EngineAudio = (() => {
     if (subOsc) subOsc.frequency.setTargetAtTime(freq, now, smoothing);
     if (modOsc) modOsc.frequency.setTargetAtTime(freq, now, smoothing);
 
-    // Body brightens and noise opens up as revs climb.
-    if (bodyFilter) bodyFilter.frequency.setTargetAtTime(450 + n * 4200, now, smoothing);
-    if (noiseBand) noiseBand.frequency.setTargetAtTime(250 + n * 1400, now, smoothing);
+    // Body brightens and noise opens up as revs climb, but stays darker
+    // overall to keep the deep, throaty character.
+    if (bodyFilter) bodyFilter.frequency.setTargetAtTime(300 + n * 2400, now, smoothing);
+    if (noiseBand) noiseBand.frequency.setTargetAtTime(150 + n * 900, now, smoothing);
 
     // Turbo spools in with load: pitch + volume rise sharply past mid-range.
-    const spool = Math.pow(n, 1.7);
-    if (turboOsc) turboOsc.frequency.setTargetAtTime(1500 + n * 6500, now, smoothing);
-    if (turboFilter) turboFilter.frequency.setTargetAtTime(2500 + n * 5000, now, smoothing);
-    if (turboGain) turboGain.gain.setTargetAtTime(0.015 + spool * 0.05, now, 0.12);
-    if (whooshGain) whooshGain.gain.setTargetAtTime(spool * 0.06, now, 0.12);
+    // Kept lower and quieter so it doesn't thin out the throaty low end.
+    const spool = Math.pow(n, 2);
+    if (turboOsc) turboOsc.frequency.setTargetAtTime(1100 + n * 4200, now, smoothing);
+    if (turboFilter) turboFilter.frequency.setTargetAtTime(1800 + n * 3500, now, smoothing);
+    if (turboGain) turboGain.gain.setTargetAtTime(0.008 + spool * 0.03, now, 0.12);
+    if (whooshGain) whooshGain.gain.setTargetAtTime(spool * 0.035, now, 0.12);
 
     // Overall level rises modestly with revs.
     const volume = 0.14 + n * 0.16;
