@@ -1,14 +1,16 @@
 /* =========================================================
-   Porsche flat-six engine sound synthesizer (Web Audio API)
+   Porsche flat-six turbo engine sound (Web Audio API)
    ---------------------------------------------------------
-   No audio files required — the engine note is generated live
-   and its pitch/timbre track the current RPM.
+   No audio files. The engine note is generated live and tracks RPM.
 
-   A 4-stroke flat-six fires 3 times per crank revolution, so the
-   fundamental "firing" frequency is (RPM / 60) * 3. We stack a few
-   detuned sawtooth oscillators on that fundamental, push them through
-   a waveshaper for the raspy boxer rasp, and open a lowpass filter as
-   revs climb so the engine "wakes up" toward redline.
+   Realistic engines are NOT a steady tone — they are a rapid train of
+   combustion PULSES. A 4-stroke flat-six fires 3 times per crank
+   revolution, so the firing rate is (RPM / 60) * 3 (40 Hz at idle,
+   ~375 Hz near redline). We build the engine by amplitude-modulating
+   a harmonic + noise "body" with a sharp pulse at that firing rate,
+   which produces the boxer "blare/buzz" instead of a sci-fi drone.
+   On top we layer a turbo spool whistle and an intake whoosh that
+   rise with load, plus a low sub rumble.
    ========================================================= */
 
 const EngineAudio = (() => {
@@ -16,41 +18,77 @@ const EngineAudio = (() => {
   let started = false;
   let enabled = false;
 
-  // Oscillator bank + processing nodes
-  let oscillators = [];
-  let oscGain = null;     // master gain for the oscillator bank
-  let toneFilter = null;  // lowpass that opens with RPM
-  let shaper = null;      // waveshaper for harmonic grit
-  let masterGain = null;  // overall output volume
-  let subOsc = null;      // low rumble
+  // Graph nodes
+  let masterGain = null;     // overall output
+  let amGain = null;         // gain that gets pulse-modulated (the firing)
+  let bodyFilter = null;     // lowpass that opens with RPM
+  let engineGain = null;     // engine tone level into master
+
+  let toneOscs = [];         // pitched harmonics feeding the AM stage
+  let noiseSrc = null;       // looping noise -> bandpass (combustion grit)
+  let noiseBand = null;
+  let noiseGain = null;
+
+  let modOsc = null;         // pulse modulator at firing frequency
+  let modShaper = null;      // shapes saw -> sharp pulse
+  let modDepth = null;       // pulse depth into amGain.gain
+
+  let subOsc = null;         // low rumble
   let subGain = null;
+
+  let turboOsc = null;       // spool whistle
+  let turboGain = null;
+  let turboFilter = null;
+  let whooshGain = null;     // filtered noise intake whoosh
+  let whooshFilter = null;
 
   let currentRpm = 800;
   let rafId = null;
 
-  // Relative pitch multiples for the oscillator bank (firing-order harmonics).
+  const IDLE_RPM = 800;
+  const MAX_RPM = 7500;
+
+  // Pitched harmonics of the firing frequency (kept nearly in-tune to
+  // avoid the warbly "beating" that made it sound alien).
   const HARMONICS = [
-    { mult: 1, type: 'sawtooth', gain: 0.55, detune: 0 },
-    { mult: 1, type: 'sawtooth', gain: 0.45, detune: 8 },
-    { mult: 2, type: 'sawtooth', gain: 0.3, detune: -6 },
-    { mult: 0.5, type: 'square', gain: 0.25, detune: 0 },
-    { mult: 3, type: 'triangle', gain: 0.12, detune: 4 },
+    { mult: 1, type: 'sawtooth', gain: 0.5, detune: 0 },
+    { mult: 2, type: 'sawtooth', gain: 0.3, detune: 3 },
+    { mult: 3, type: 'square', gain: 0.14, detune: 0 },
+    { mult: 4, type: 'sawtooth', gain: 0.08, detune: -3 },
   ];
 
-  function makeDistortionCurve(amount) {
-    const samples = 1024;
-    const curve = new Float32Array(samples);
-    const k = amount;
-    for (let i = 0; i < samples; i += 1) {
-      const x = (i * 2) / samples - 1;
-      curve[i] = ((3 + k) * x * 20 * (Math.PI / 180)) / (Math.PI + k * Math.abs(x));
+  function firingFrequency(rpm) {
+    return (rpm / 60) * 3; // flat-six fires 3x per revolution
+  }
+
+  function norm(rpm) {
+    return Math.min(Math.max((rpm - IDLE_RPM) / (MAX_RPM - IDLE_RPM), 0), 1);
+  }
+
+  // Turns a -1..1 sawtooth into a sharp one-sided pulse (the firing spike).
+  function makePulseCurve() {
+    const n = 2048;
+    const curve = new Float32Array(n);
+    for (let i = 0; i < n; i += 1) {
+      const x = (i / (n - 1)) * 2 - 1; // -1..1
+      const pos = Math.max(0, x);       // keep only positive half
+      curve[i] = Math.pow(pos, 3);      // exponent => spike sharpness
     }
     return curve;
   }
 
-  function firingFrequency(rpm) {
-    // Flat-six fires 3x per revolution.
-    return (rpm / 60) * 3;
+  function makeNoiseBuffer() {
+    const len = ctx.sampleRate * 2;
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    let last = 0;
+    for (let i = 0; i < len; i += 1) {
+      // slightly low-passed (brown-ish) noise reads as mechanical, not hiss
+      const white = Math.random() * 2 - 1;
+      last = (last + 0.04 * white) / 1.04;
+      data[i] = last * 3.2;
+    }
+    return buf;
   }
 
   function build() {
@@ -60,25 +98,25 @@ const EngineAudio = (() => {
     masterGain.gain.value = 0.0;
     masterGain.connect(ctx.destination);
 
-    // Oscillator bank -> shaper -> lowpass -> oscGain -> master
-    shaper = ctx.createWaveShaper();
-    shaper.curve = makeDistortionCurve(6);
-    shaper.oversample = '4x';
+    // ---- Engine body: harmonics + noise -> AM gain -> body filter ----
+    bodyFilter = ctx.createBiquadFilter();
+    bodyFilter.type = 'lowpass';
+    bodyFilter.frequency.value = 600;
+    bodyFilter.Q.value = 3;
 
-    toneFilter = ctx.createBiquadFilter();
-    toneFilter.type = 'lowpass';
-    toneFilter.frequency.value = 700;
-    toneFilter.Q.value = 6;
+    engineGain = ctx.createGain();
+    engineGain.gain.value = 0.9;
 
-    oscGain = ctx.createGain();
-    oscGain.gain.value = 0.5;
+    amGain = ctx.createGain();
+    amGain.gain.value = 0.18; // baseline; pulse modulation rides on top
 
-    shaper.connect(toneFilter);
-    toneFilter.connect(oscGain);
-    oscGain.connect(masterGain);
+    amGain.connect(bodyFilter);
+    bodyFilter.connect(engineGain);
+    engineGain.connect(masterGain);
 
     const baseFreq = firingFrequency(currentRpm);
-    oscillators = HARMONICS.map((h) => {
+
+    toneOscs = HARMONICS.map((h) => {
       const osc = ctx.createOscillator();
       osc.type = h.type;
       osc.frequency.value = baseFreq * h.mult;
@@ -86,55 +124,120 @@ const EngineAudio = (() => {
       const g = ctx.createGain();
       g.gain.value = h.gain;
       osc.connect(g);
-      g.connect(shaper);
+      g.connect(amGain);
       osc.start();
-      return { osc, gain: g, config: h };
+      return { osc, config: h };
     });
 
-    // Low-frequency rumble for body
+    // Combustion grit: looping noise through a bandpass into the AM stage
+    const noiseBuf = makeNoiseBuffer();
+    noiseSrc = ctx.createBufferSource();
+    noiseSrc.buffer = noiseBuf;
+    noiseSrc.loop = true;
+    noiseBand = ctx.createBiquadFilter();
+    noiseBand.type = 'bandpass';
+    noiseBand.frequency.value = 320;
+    noiseBand.Q.value = 0.8;
+    noiseGain = ctx.createGain();
+    noiseGain.gain.value = 0.5;
+    noiseSrc.connect(noiseBand);
+    noiseBand.connect(noiseGain);
+    noiseGain.connect(amGain);
+    noiseSrc.start();
+
+    // ---- Pulse modulator (the firing) drives amGain.gain ----
+    modOsc = ctx.createOscillator();
+    modOsc.type = 'sawtooth';
+    modOsc.frequency.value = baseFreq;
+    modShaper = ctx.createWaveShaper();
+    modShaper.curve = makePulseCurve();
+    modDepth = ctx.createGain();
+    modDepth.gain.value = 0.85; // how punchy each firing pulse is
+    modOsc.connect(modShaper);
+    modShaper.connect(modDepth);
+    modDepth.connect(amGain.gain);
+    modOsc.start();
+
+    // ---- Sub rumble for body ----
     subOsc = ctx.createOscillator();
     subOsc.type = 'sine';
     subOsc.frequency.value = baseFreq;
     subGain = ctx.createGain();
-    subGain.gain.value = 0.25;
+    subGain.gain.value = 0.22;
     subOsc.connect(subGain);
     subGain.connect(masterGain);
     subOsc.start();
 
+    // ---- Turbo spool whistle ----
+    turboFilter = ctx.createBiquadFilter();
+    turboFilter.type = 'bandpass';
+    turboFilter.frequency.value = 3000;
+    turboFilter.Q.value = 8;
+    turboGain = ctx.createGain();
+    turboGain.gain.value = 0.0;
+    turboOsc = ctx.createOscillator();
+    turboOsc.type = 'triangle';
+    turboOsc.frequency.value = 2000;
+    turboOsc.connect(turboFilter);
+    turboFilter.connect(turboGain);
+    turboGain.connect(masterGain);
+    turboOsc.start();
+
+    // ---- Intake/turbo whoosh (filtered noise) ----
+    whooshFilter = ctx.createBiquadFilter();
+    whooshFilter.type = 'highpass';
+    whooshFilter.frequency.value = 2500;
+    whooshGain = ctx.createGain();
+    whooshGain.gain.value = 0.0;
+    const whooshSrc = ctx.createBufferSource();
+    whooshSrc.buffer = noiseBuf;
+    whooshSrc.loop = true;
+    whooshSrc.connect(whooshFilter);
+    whooshFilter.connect(whooshGain);
+    whooshGain.connect(masterGain);
+    whooshSrc.start();
+
     started = true;
   }
 
-  function rpmToParams(rpm) {
-    const freq = firingFrequency(rpm);
-    const norm = Math.min(Math.max((rpm - 800) / (7500 - 800), 0), 1);
-    // Filter opens up as revs climb -> brighter, angrier note.
-    const cutoff = 500 + norm * 4200;
-    // Slightly louder at higher revs.
-    const volume = 0.12 + norm * 0.16;
-    return { freq, cutoff, volume };
-  }
-
-  function applyRpm(rpm, smoothing = 0.08) {
+  function applyRpm(rpm, smoothing = 0.06) {
     if (!started || !ctx) return;
     const now = ctx.currentTime;
-    const { freq, cutoff, volume } = rpmToParams(rpm);
+    const freq = firingFrequency(rpm);
+    const n = norm(rpm);
 
-    oscillators.forEach(({ osc, config }) => {
+    // Pitched parts track the firing frequency.
+    toneOscs.forEach(({ osc, config }) => {
       osc.frequency.setTargetAtTime(freq * config.mult, now, smoothing);
     });
     if (subOsc) subOsc.frequency.setTargetAtTime(freq, now, smoothing);
-    if (toneFilter) toneFilter.frequency.setTargetAtTime(cutoff, now, smoothing);
+    if (modOsc) modOsc.frequency.setTargetAtTime(freq, now, smoothing);
+
+    // Body brightens and noise opens up as revs climb.
+    if (bodyFilter) bodyFilter.frequency.setTargetAtTime(450 + n * 4200, now, smoothing);
+    if (noiseBand) noiseBand.frequency.setTargetAtTime(250 + n * 1400, now, smoothing);
+
+    // Turbo spools in with load: pitch + volume rise sharply past mid-range.
+    const spool = Math.pow(n, 1.7);
+    if (turboOsc) turboOsc.frequency.setTargetAtTime(1500 + n * 6500, now, smoothing);
+    if (turboFilter) turboFilter.frequency.setTargetAtTime(2500 + n * 5000, now, smoothing);
+    if (turboGain) turboGain.gain.setTargetAtTime(0.015 + spool * 0.05, now, 0.12);
+    if (whooshGain) whooshGain.gain.setTargetAtTime(spool * 0.06, now, 0.12);
+
+    // Overall level rises modestly with revs.
+    const volume = 0.14 + n * 0.16;
     if (masterGain && enabled) masterGain.gain.setTargetAtTime(volume, now, smoothing);
   }
 
-  // Tiny continuous wobble so a steady RPM still sounds alive (idle lope).
+  // Idle lope: tiny modulation so a steady low RPM still feels alive.
   function animate() {
     if (!enabled) return;
     const t = ctx ? ctx.currentTime : 0;
-    const lope = Math.sin(t * (currentRpm < 1500 ? 6 : 12)) * (currentRpm < 1500 ? 4 : 2);
-    if (toneFilter) {
-      const { cutoff } = rpmToParams(currentRpm);
-      toneFilter.frequency.setTargetAtTime(cutoff + lope * 20, ctx.currentTime, 0.05);
+    if (modDepth && currentRpm < 1600) {
+      const lope = 0.85 + Math.sin(t * 7) * 0.12;
+      modDepth.gain.setTargetAtTime(lope, ctx.currentTime, 0.05);
+    } else if (modDepth) {
+      modDepth.gain.setTargetAtTime(0.85, ctx.currentTime, 0.08);
     }
     rafId = requestAnimationFrame(animate);
   }
@@ -145,7 +248,7 @@ const EngineAudio = (() => {
     enabled = true;
     applyRpm(currentRpm, 0.2);
     if (masterGain) {
-      const { volume } = rpmToParams(currentRpm);
+      const volume = 0.14 + norm(currentRpm) * 0.16;
       masterGain.gain.cancelScheduledValues(ctx.currentTime);
       masterGain.gain.setTargetAtTime(volume, ctx.currentTime, 0.15);
     }
@@ -168,11 +271,8 @@ const EngineAudio = (() => {
       applyRpm(rpm);
     },
     toggle() {
-      if (enabled) {
-        disable();
-      } else {
-        enable();
-      }
+      if (enabled) disable();
+      else enable();
       return enabled;
     },
     isEnabled() {
