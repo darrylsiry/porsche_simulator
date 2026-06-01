@@ -577,9 +577,8 @@ input[type="range"]::-moz-range-thumb {
     linear-gradient(#fff, #fff) 100% 0 / 3px 100% no-repeat,
     /* center horizontal connector */
     linear-gradient(#fff, #fff) 0 50% / 100% 3px no-repeat;
-  /* expand the rail to reach the slot centers in each column/row */
-  margin: -1px;
-  inset: 33.5% 28.7%;
+  /* span exactly between the circle centers so each line ends at a circle */
+  inset: 36% 28.7%;
   opacity: 0.92;
 }
 
