@@ -1,0 +1,14 @@
+{
+  "rewrites": [
+    {
+      "source": "/",
+      "has": [{ "type": "host", "value": "siryous.app" }],
+      "destination": "/hub/index.html"
+    },
+    {
+      "source": "/",
+      "has": [{ "type": "host", "value": "www.siryous.app" }],
+      "destination": "/hub/index.html"
+    }
+  ]
+}
